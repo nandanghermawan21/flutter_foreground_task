@@ -2,6 +2,7 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:http/http.dart' as http;
 
 void main() => runApp(const ExampleApp());
 
@@ -12,14 +13,12 @@ void startCallback() {
 }
 
 class FirstTaskHandler extends TaskHandler {
-  int updateCount = 0;
-
   @override
   Future<void> onStart(DateTime timestamp, SendPort? sendPort) async {
     // You can use the getData function to get the data you saved.
-    final customData =
-        await FlutterForegroundTask.getData<String>(key: 'customData');
-    print('customData: $customData');
+    // final customData =
+    //     await FlutterForegroundTask.getData<String>(key: 'customData');
+    // print('customData: $customData');
   }
 
   @override
@@ -27,13 +26,10 @@ class FirstTaskHandler extends TaskHandler {
     FlutterForegroundTask.updateService(
         notificationTitle: 'FirstTaskHandler',
         notificationText: timestamp.toString(),
-        callback: updateCount >= 10 ? updateCallback : null);
+        callback: null);
 
     // Send data to the main isolate.
     sendPort?.send(timestamp);
-    sendPort?.send(updateCount);
-
-    updateCount++;
   }
 
   @override
@@ -46,32 +42,6 @@ class FirstTaskHandler extends TaskHandler {
   void onButtonPressed(String id) {
     // Called when the notification button on the Android platform is pressed.
     print('onButtonPressed >> $id');
-  }
-}
-
-void updateCallback() {
-  FlutterForegroundTask.setTaskHandler(SecondTaskHandler());
-}
-
-class SecondTaskHandler extends TaskHandler {
-  @override
-  Future<void> onStart(DateTime timestamp, SendPort? sendPort) async {
-
-  }
-
-  @override
-  Future<void> onEvent(DateTime timestamp, SendPort? sendPort) async {
-    FlutterForegroundTask.updateService(
-        notificationTitle: 'SecondTaskHandler',
-        notificationText: timestamp.toString());
-
-    // Send data to the main isolate.
-    sendPort?.send(timestamp);
-  }
-
-  @override
-  Future<void> onDestroy(DateTime timestamp) async {
-
   }
 }
 
@@ -93,6 +63,7 @@ class _ExampleAppState extends State<ExampleApp> {
         channelDescription:
             'This notification appears when the foreground service is running.',
         channelImportance: NotificationChannelImportance.LOW,
+        visibility: NotificationVisibility.VISIBILITY_SECRET,
         priority: NotificationPriority.LOW,
         iconData: const NotificationIconData(
           resType: ResourceType.mipmap,
@@ -134,13 +105,16 @@ class _ExampleAppState extends State<ExampleApp> {
 
     if (receivePort != null) {
       _receivePort = receivePort;
-      _receivePort?.listen((message) {
-        if (message is DateTime) {
-          print('receive timestamp: $message');
-        } else if (message is int) {
-          print('receive updateCount: $message');
-        }
-      });
+      _receivePort?.listen(
+        (message) {
+          if (message is DateTime) {
+            print('receive timestamp: $message ');
+          } else if (message is int) {
+            print('receive updateCount: $message');
+          }
+          sendDataToApi();
+        },
+      );
 
       return true;
     }
@@ -197,6 +171,19 @@ class _ExampleAppState extends State<ExampleApp> {
     return ElevatedButton(
       child: Text(text),
       onPressed: onPressed,
+    );
+  }
+
+  void sendDataToApi() {
+    print('start send data');
+    http
+        .get(Uri.parse("https://api-suzuki.lemburkuring.id/api/city/getAll"))
+        .then((value) {
+      print("send data success");
+    }).catchError(
+      (onError) {
+        print("send data failed");
+      },
     );
   }
 }
